@@ -73,7 +73,7 @@ class Trainer:
 
         return multiclass_accuracy(pred, y)
         
-    def fit(self):
+    def fit(self, output = False):
         '''
         Trains a model
         '''
@@ -116,8 +116,9 @@ class Trainer:
             val_accuracy = self.compute_accuracy(self.dataset.val_X,
                                                  self.dataset.val_y)
 
-            print("Loss: %f, Train accuracy: %f, val accuracy: %f" % 
-                  (batch_losses[-1], train_accuracy, val_accuracy))
+            if output:
+                print("Loss: %f, Train accuracy: %f, val accuracy: %f" % 
+                    (batch_losses[-1], train_accuracy, val_accuracy))
 
             loss_history.append(ave_loss)
             train_acc_history.append(train_accuracy)

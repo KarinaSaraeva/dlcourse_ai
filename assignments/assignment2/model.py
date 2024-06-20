@@ -18,7 +18,10 @@ class TwoLayerNet:
         """
         self.reg = reg
         # TODO Create necessary layers
-        raise Exception("Not implemented!")
+        self.Layers = []
+        self.Layers = [FullyConnectedLayer(n_input=n_input, n_output=hidden_layer_size), 
+                        ReLULayer(), 
+                        FullyConnectedLayer(n_input=hidden_layer_size, n_output=n_output)]
 
     def compute_loss_and_gradients(self, X, y):
         """
@@ -33,14 +36,28 @@ class TwoLayerNet:
         # clear parameter gradients aggregated from the previous pass
         # TODO Set parameter gradient to zeros
         # Hint: using self.params() might be useful!
-        raise Exception("Not implemented!")
+
+        for key, value in self.params().items():
+          value.grad *= 0
         
         # TODO Compute loss and fill param gradients
         # by running forward and backward passes through the model
-        
+
+        for layer in self.Layers:
+          X = layer.forward(X)
+
+        loss, dprediction = softmax_with_cross_entropy(X, y)
+
+        dout = dprediction
+        for layer in reversed(self.Layers):
+          dout = layer.backward(dout)  
+  
         # After that, implement l2 regularization on all params
         # Hint: self.params() is useful again!
-        raise Exception("Not implemented!")
+        for key, value in self.params().items():
+          l2_loss, l2_grad = l2_regularization(value.value, self.reg)
+          value.grad += l2_grad
+          loss += l2_loss
 
         return loss
 
@@ -59,14 +76,15 @@ class TwoLayerNet:
         # can be reused
         pred = np.zeros(X.shape[0], np.int)
 
-        raise Exception("Not implemented!")
+        for layer in self.Layers:
+          X = layer.forward(X)
+        pred = np.argmax(X, axis=1)
         return pred
 
     def params(self):
         result = {}
-
         # TODO Implement aggregating all of the params
-
-        raise Exception("Not implemented!")
-
+        for i in range(len(self.Layers)):
+          for key, value in self.Layers[i].params().items():
+            result[key+str(i)] = value
         return result

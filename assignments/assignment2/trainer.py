@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import numpy as np
+import warnings
 from metrics import multiclass_accuracy
 
 
@@ -27,7 +28,7 @@ class Trainer:
                  num_epochs=20,
                  batch_size=20,
                  learning_rate=1e-2,
-                 learning_rate_decay=1.0):
+                 learning_rate_decay=1.0, patience = None):
         """
         Initializes the trainer
 
@@ -50,6 +51,7 @@ class Trainer:
         self.learning_rate_decay = learning_rate_decay
 
         self.optimizers = None
+        self.patience = patience
 
     def setup_optimizers(self):
         params = self.model.params()
@@ -74,7 +76,7 @@ class Trainer:
 
         return multiclass_accuracy(pred, y)
 
-    def fit(self):
+    def fit(self, output = True, test_loss = False):
         """
         Trains a model
         """
@@ -87,44 +89,64 @@ class Trainer:
         train_acc_history = []
         val_acc_history = []
         
-        for epoch in range(self.num_epochs):
-            shuffled_indices = np.arange(num_train)
-            np.random.shuffle(shuffled_indices)
-            sections = np.arange(self.batch_size, num_train, self.batch_size)
-            batches_indices = np.array_split(shuffled_indices, sections)
+        #DONE: Added to monitor overfiting
+        test_loss_history = []
 
-            batch_losses = []
+        try:    
+            for epoch in range(self.num_epochs):
+                shuffled_indices = np.arange(num_train)
+                np.random.shuffle(shuffled_indices)
+                sections = np.arange(self.batch_size, num_train, self.batch_size)
+                batches_indices = np.array_split(shuffled_indices, sections)
 
-            for batch_indices in batches_indices:
-                # TODO Generate batches based on batch_indices and
-                # use model to generate loss and gradients for all
-                # the params
+                batch_losses = []
+                
+                for batch_indices in batches_indices:
+                    # TODO Generate batches based on batch_indices and
+                    # use model to generate loss and gradients for all
+                    # the params
+                    batch_X = self.dataset.train_X[batch_indices]
+                    batch_y = self.dataset.train_y[batch_indices]
 
-                raise Exception("Not implemented!")
+                    loss = self.model.compute_loss_and_gradients(batch_X.copy(), batch_y.copy())
 
-                for param_name, param in self.model.params().items():
-                    optimizer = self.optimizers[param_name]
-                    param.value = optimizer.update(param.value, param.grad, self.learning_rate)
+                    for param_name, param in self.model.params().items():
+                        optimizer = self.optimizers[param_name]
+                        param.value = optimizer.update(param.value, param.grad, self.learning_rate)
 
-                batch_losses.append(loss)
+                    batch_losses.append(loss)
 
-            if np.not_equal(self.learning_rate_decay, 1.0):
-                # TODO: Implement learning rate decay
-                raise Exception("Not implemented!")
+                if np.not_equal(self.learning_rate_decay, 1.0):
+                    # TODO: Implement learning rate decay
+                    self.learning_rate *= self.learning_rate_decay                                                                                                    
 
-            ave_loss = np.mean(batch_losses)
+                ave_loss = np.mean(batch_losses)
 
-            train_accuracy = self.compute_accuracy(self.dataset.train_X,
-                                                   self.dataset.train_y)
+                train_accuracy = self.compute_accuracy(self.dataset.train_X,
+                                                    self.dataset.train_y)
 
-            val_accuracy = self.compute_accuracy(self.dataset.val_X,
-                                                 self.dataset.val_y)
+                val_accuracy = self.compute_accuracy(self.dataset.val_X,
+                                                    self.dataset.val_y)
 
-            print("Loss: %f, Train accuracy: %f, val accuracy: %f" %
-                  (batch_losses[-1], train_accuracy, val_accuracy))
+                if output:
+                    print("Loss: %f, Train accuracy: %f, val accuracy: %f" %
+                        (batch_losses[-1], train_accuracy, val_accuracy))
 
-            loss_history.append(ave_loss)
-            train_acc_history.append(train_accuracy)
-            val_acc_history.append(val_accuracy)
+                loss_history.append(ave_loss)
+                train_acc_history.append(train_accuracy)
+                val_acc_history.append(val_accuracy)
 
-        return loss_history, train_acc_history, val_acc_history
+                # DONE: Added list to monitor test lost
+                if test_loss:
+                    loss = self.model.compute_loss_and_gradients(self.dataset.val_X, self.dataset.val_y)
+                    test_loss_history.append(loss)
+
+                # DONE: Added to monitor overfiting
+                if self.patience is not None:
+                    if np.argmin(np.array(loss_history)) < (len(loss_history) - self.patience):
+                        if (loss_history[-1] > loss_history[-2]):
+                            print(f"OVERFITING STARTED | epoch: {epoch} |  batch_size: {self.batch_size} | learning_rate {self.learning_rate}")
+                            raise Exception('Overfiting started!')
+        except:
+            return loss_history, train_acc_history, val_acc_history, test_loss_history
+        return loss_history, train_acc_history, val_acc_history, test_loss_history
